@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: bet_postgres
+    environment:
+      POSTGRES_DB: betdb
+      POSTGRES_USER: betuser
+      POSTGRES_PASSWORD: betpass
+    ports:
+      - "60000:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: bet_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
