@@ -9,4 +9,5 @@ public record DepositRequest(
         @NotNull
         @Positive
         BigDecimal amount
+
 ) {}

@@ -65,7 +65,7 @@ class WalletConcurrencyTest {
 
         Runnable withdrawTask = () -> {
             try {
-                walletService.withdraw(user, new BigDecimal("100"));
+                walletService.withdraw(user, new BigDecimal("100"), UUID.randomUUID().toString());
             } catch (Exception ignored){}
             latch.countDown();
         };

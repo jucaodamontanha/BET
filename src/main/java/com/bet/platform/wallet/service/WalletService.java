@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+
 
 @Service
 @RequiredArgsConstructor
@@ -24,14 +26,20 @@ public class WalletService {
     private final TransactionRepository transactionRepository;
 
     @Transactional
-    public void deposit(User user, BigDecimal amount) {
+    public Transaction deposit(User user, BigDecimal amount, String idempotencyKey) {
+
+        Optional<Transaction> existing =
+                transactionRepository.findByIdempotencyKey(idempotencyKey);
+
+        if (existing.isPresent()) {
+            return existing.get(); // 👈 já processado
+        }
 
         Wallet wallet = walletRepository
                 .findByUserIdForUpdate(user.getId())
                 .orElseThrow(() -> new RuntimeException("Wallet not found"));
 
         wallet.setBalance(wallet.getBalance().add(amount));
-        walletRepository.save(wallet);
 
         Transaction transaction = Transaction.builder()
                 .wallet(wallet)
@@ -39,17 +47,23 @@ public class WalletService {
                 .type(TransactionType.DEPOSIT)
                 .origin(TransactionOrigin.USER)
                 .status(TransactionStatus.COMPLETED)
+                .idempotencyKey(idempotencyKey)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        transactionRepository.save(transaction);
+        return transactionRepository.save(transaction);
     }
 
     @Transactional
-    public void withdraw(User user, BigDecimal amount) {
+    public void withdraw(User user, BigDecimal amount, String idempotencyKey) {
 
-        Wallet wallet = walletRepository.findByUserIdForUpdate(user.getId())
-                .orElseThrow();
+        if (transactionRepository.existsByIdempotencyKey(idempotencyKey)) {
+            return;
+        }
+
+        Wallet wallet = walletRepository
+                .findByUserIdForUpdate(user.getId())
+                .orElseThrow(() -> new RuntimeException("Wallet not found"));
 
         if (wallet.getBalance().compareTo(amount) < 0) {
             throw new RuntimeException("Insufficient balance");
@@ -64,10 +78,11 @@ public class WalletService {
                 .origin(TransactionOrigin.USER)
                 .status(TransactionStatus.COMPLETED)
                 .createdAt(LocalDateTime.now())
+                .idempotencyKey(idempotencyKey)
                 .build();
-
         transactionRepository.save(transaction);
     }
+
     @Transactional(readOnly = true)
     public BigDecimal getBalance(User user) {
 
